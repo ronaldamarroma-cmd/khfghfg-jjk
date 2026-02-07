@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>البنيان المرصوص بغداد الرصافه</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <h2 style="margin-bottom: 20px; color: var(--dark);">البنيان المرصوص بغداد الرصافه</h2>
+            <div class="form-group">
+                <label>رمز الدخول</label>
+                <input type="password" id="login-code" class="form-control" placeholder="أدخل الرمز هنا...">
+            </div>
+            <button onclick="window.handleLogin()" class="btn btn-primary" style="width: 100%; justify-content: center;">تسجيل الدخول</button>
+            <p style="margin-top: 15px; font-size: 12px; color: gray;">
+                للتجربة: رمز الأدمن (112200)
+            </p>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden">
+        <div class="navbar">
+            <div class="logo">
+                <img src="icon.png" alt="Logo">
+                البنيان المرصوص بغداد الرصافه
+            </div>
+            <div>
+                <span id="user-display-name" style="margin-left: 10px; font-weight: bold;"></span>
+                <button onclick="window.logout()" class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;">خروج</button>
+            </div>
+        </div>
+
+        <div class="container">
+            
+            <div id="agent-view" class="hidden">
+                <div class="book-info-card">
+                    <div class="book-header">
+                        <i class="fas fa-book"></i> معلومات الدفتر
+                    </div>
+                    
+                    <div style="text-align: right; margin-bottom: 5px; font-weight: bold;">عدد الدفاتر المستلمة:</div>
+                    <div class="book-input-row">
+                        <button onclick="window.checkBookSave()" class="btn btn-primary" style="padding: 10px 25px;">حفظ العدد</button>
+                        <input type="number" id="agent-books-input" class="form-control" style="text-align: center; font-size: 18px; max-width: 150px;" placeholder="0">
+                    </div>
+
+                    <div class="book-stats-row">
+                        <div style="margin-bottom: 5px;">
+                            عدد الوصولات المدخلة: <strong id="agent-receipts-count">0</strong>
+                        </div>
+                        <div>
+                            إجمالي المبالغ: <strong id="agent-total-amount">0 د.ع</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 id="form-title"><i class="fas fa-plus-circle"></i> إضافة وصل جديد</h3>
+                    <input type="hidden" id="edit-receipt-id"> 
+                    <div class="grid-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                        
+                        <div class="form-group">
+                            <label>رقم بداية الدفتر (للتوليد التلقائي)</label>
+                            <input type="number" id="start-receipt-num" class="form-control" placeholder="مثلاً 100" onchange="window.updateReceiptNumber()">
+                        </div>
+
+                        <div class="form-group">
+                            <label>رقم الوصل (تلقائي)</label>
+                            <input type="number" id="receipt-num" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>اسم المساهم</label>
+                            <input type="text" id="donor-name" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>المبلغ (دينار)</label>
+                            <input type="number" id="amount" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>التاريخ</label>
+                            <input type="date" id="date" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label>القاطع</label>
+                            <select id="sector" class="form-control">
+                                <option value="">اختر القاطع...</option>
+                                <option value="جنوب 1">جنوب 1</option>
+                                <option value="جنوب 2">جنوب 2</option>
+                                <option value="شمال">شمال</option>
+                                <option value="وسط">وسط</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ملاحظات (اختياري)</label>
+                        <input type="text" id="notes" class="form-control">
+                    </div>
+                    
+                    <button onclick="window.addOrUpdateReceipt()" id="save-btn" class="btn btn-primary" style="width: 100%; justify-content: center;">حفظ الوصل</button>
+                    <button onclick="window.cancelEdit()" id="cancel-edit-btn" class="btn btn-warning hidden" style="width: 100%; justify-content: center; margin-top: 5px;">إلغاء التعديل</button>
+                </div>
+
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3>سجل الوصولات</h3>
+                        <button onclick="window.exportAgentData()" class="btn btn-warning"><i class="fas fa-file-excel"></i> تصدير إكسل</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="agent-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم الوصل</th>
+                                    <th>اسم المساهم</th>
+                                    <th>المبلغ</th>
+                                    <th>التاريخ</th>
+                                    <th>ملاحظات</th>
+                                    <th>إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="admin-view" class="hidden">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">المبلغ الكلي</div>
+                        <div class="stat-value" id="total-amount">0 د.ع</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">نسبة الاستقطاع (10%)</div>
+                        <div class="stat-value" id="total-percentage">0 د.ع</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">عدد المخولين</div>
+                        <div class="stat-value" id="total-agents">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">عدد الوصولات</div>
+                        <div class="stat-value" id="total-receipts">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-tools"></i> لوحة التحكم</h3>
+                    <div style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; align-items: center;">
+                        <input type="text" id="admin-search" class="form-control" placeholder="بحث..." style="width: 200px;" onkeyup="window.renderAdminTable()">
+                        
+                        <select id="admin-filter-agent" class="form-control" style="width: 150px;" onchange="window.renderAdminTable()">
+                            <option value="all">كل المخولين</option>
+                        </select>
+                        
+                        <button onclick="window.exportAllData()" class="btn btn-warning"><i class="fas fa-file-excel"></i> تصدير الكل</button>
+                        <button onclick="window.toggleAgentModal()" class="btn btn-primary"><i class="fas fa-user-plus"></i> إضافة مخول</button>
+                        <button onclick="window.toggleAgentsSummaryModal()" class="btn btn-dark"><i class="fas fa-users-cog"></i> ملخص مبالغ المخولين</button>
+                        
+                        <button onclick="window.clearAllData()" class="btn btn-danger"><i class="fas fa-trash-alt"></i> تفريغ البيانات</button>
+                        <button onclick="window.toggleGlobalLock()" id="global-lock-btn" class="btn btn-dark"><i class="fas fa-lock"></i> قفل عام</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>إدارة المخولين (تحكم بالحسابات)</h3>
+                    <div class="table-responsive">
+                        <table id="users-control-table">
+                            <thead>
+                                <tr>
+                                    <th>اسم المخول</th>
+                                    <th>رقم الهاتف</th>
+                                    <th>عدد الدفاتر</th> <th>العنوان/الدائرة</th>
+                                    <th>الحالة</th>
+                                    <th>إجراءات الحساب</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>سجل التبرعات الشامل</h3>
+                    <div class="table-responsive">
+                        <table id="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>رقم الوصل</th>
+                                    <th>اسم المخول</th>
+                                    <th>اسم المساهم</th>
+                                    <th>المبلغ</th>
+                                    <th>التاريخ</th>
+                                    <th>تاريخ الإدخال</th>
+                                    <th>إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="agent-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button onclick="window.toggleAgentModal()" class="close-modal-btn">&times;</button>
+            <h3 id="agent-modal-title">إضافة مخول جديد</h3>
+            <input type="hidden" id="edit-agent-id">
+            <div class="form-group"><label>اسم المخول</label><input type="text" id="new-agent-name" class="form-control"></div>
+            <div class="form-group"><label>رقم الهاتف</label><input type="text" id="new-agent-phone" class="form-control"></div>
+            <div class="form-group"><label>الدائرة أو العنوان</label><input type="text" id="new-agent-address" class="form-control"></div>
+            <div class="form-group"><label>رمز الدخول</label><input type="text" id="new-agent-code" class="form-control"></div>
+            <button onclick="window.saveAgentProcess()" class="btn btn-primary" style="width: 100%;">حفظ البيانات</button>
+        </div>
+    </div>
+
+    <div id="agents-summary-modal" class="modal-overlay hidden">
+        <div class="modal-content" style="max-width: 900px;">
+            <button onclick="window.toggleAgentsSummaryModal()" class="close-modal-btn">&times;</button>
+            <h3><i class="fas fa-list-alt"></i> ملخص مبالغ ونسب المخولين</h3>
+            <div style="margin: 15px 0;">
+                <button onclick="window.exportAgentsSummary()" class="btn btn-warning"><i class="fas fa-file-excel"></i> تصدير الملخص إكسل</button>
+            </div>
+            <div class="table-responsive">
+                <table id="agents-summary-table">
+                    <thead>
+                        <tr>
+                            <th>اسم المخول</th>
+                            <th>عدد الوصولات</th>
+                            <th>المبلغ الكلي</th>
+                            <th>النسبة الكلية (10%)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-edit-receipt-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button onclick="window.closeAdminEditModal()" class="close-modal-btn">&times;</button>
+            <h3><i class="fas fa-edit"></i> تعديل الوصل (إدارة)</h3>
+            <input type="hidden" id="admin-edit-receipt-id">
+            <div class="form-group"><label>رقم الوصل</label><input type="number" id="admin-edit-num" class="form-control"></div>
+            <div class="form-group"><label>اسم المساهم</label><input type="text" id="admin-edit-donor" class="form-control"></div>
+            <div class="form-group"><label>المبلغ</label><input type="number" id="admin-edit-amount" class="form-control"></div>
+            <div class="form-group"><label>التاريخ</label><input type="date" id="admin-edit-date" class="form-control"></div>
+            <div class="form-group"><label>القاطع</label><select id="admin-edit-sector" class="form-control"><option value="جنوب 1">جنوب 1</option><option value="جنوب 2">جنوب 2</option><option value="شمال">شمال</option><option value="وسط">وسط</option></select></div>
+            <div class="form-group"><label>ملاحظات</label><input type="text" id="admin-edit-notes" class="form-control"></div>
+            <button onclick="window.saveAdminReceiptEdit()" class="btn btn-primary" style="width: 100%;">حفظ التعديلات</button>
+        </div>
+    </div>
+
+    <div id="pin-modal" class="modal-overlay hidden">
+        <div class="modal-content pin-box">
+            <div style="text-align: center;">
+                <i class="fas fa-shield-alt" style="font-size: 50px; color: var(--primary); margin-bottom: 15px;"></i>
+                <h3>إجراء محمي</h3>
+                <p style="margin-bottom: 15px;">أدخل رمز التعديل للمتابعة</p>
+                <input type="password" id="book-edit-pin" class="form-control" style="text-align: center; font-size: 20px; letter-spacing: 5px;" placeholder="****">
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button onclick="window.verifyBookPin()" class="btn btn-primary" style="flex: 1;">تحقق</button>
+                    <button onclick="window.closePinModal()" class="btn btn-danger" style="flex: 1;">إلغاء</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
