@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
 import { 
     getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, 
-    enableIndexedDbPersistence, query, orderBy 
+    enableIndexedDbPersistence, query, orderBy, writeBatch 
 } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
 // --- 1. إعدادات Firebase ---
@@ -55,7 +55,7 @@ function startListeners() {
         if(appData.users.length === 0) {
             addDoc(collection(db, "users"), {
                 name: "الإدارة العامة",
-                code: "112200", // الرمز الجديد
+                code: "112200", 
                 role: "admin",
                 booksCount: 0,
                 locked: false,
@@ -67,8 +67,8 @@ function startListeners() {
         if(appData.currentUser) refreshUI();
     });
 
-    // استماع للوصولات
-    const q = query(collection(db, "receipts"), orderBy("id", "desc"));
+    // استماع للوصولات - تعديل الفرز ليكون تصاعدي (الأقدم أولاً)
+    const q = query(collection(db, "receipts"), orderBy("id", "asc"));
     onSnapshot(q, (snapshot) => {
         appData.receipts = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
         if(appData.currentUser) refreshUI();
@@ -160,6 +160,14 @@ function initAgentView() {
     
     document.getElementById('agent-books-input').value = appData.currentUser.booksCount || "";
     
+    // التحقق من نوع المخول لإخفاء/إظهار القاطع
+    const sectorGroup = document.getElementById('sector-group');
+    if (appData.currentUser.agentType === 'friday_prayer') {
+        sectorGroup.classList.add('hidden'); // إخفاء القائمة
+    } else {
+        sectorGroup.classList.remove('hidden');
+    }
+
     renderAgentTable();
     updateReceiptNumber(); 
 }
@@ -202,8 +210,8 @@ window.updateReceiptNumber = function() {
     const startNum = parseInt(document.getElementById('start-receipt-num').value) || 0;
     const currentVal = document.getElementById('receipt-num').value;
     
-    const myReceipts = appData.receipts.filter(r => r.userId === appData.currentUser.id); // استخدام ID الوثيقة كمعرف
-    // الترتيب تم في الاستعلام، ولكن احتياطاً
+    const myReceipts = appData.receipts.filter(r => r.userId === appData.currentUser.id);
+    // الترتيب تصاعدي
     myReceipts.sort((a, b) => a.receiptNum - b.receiptNum);
     
     let nextNum;
@@ -220,13 +228,18 @@ window.updateReceiptNumber = function() {
 }
 
 window.addOrUpdateReceipt = function() {
-    const editId = document.getElementById('edit-receipt-id').value; // هذا سيكون docId
+    const editId = document.getElementById('edit-receipt-id').value; 
     const receiptNum = document.getElementById('receipt-num').value;
     const donorName = document.getElementById('donor-name').value;
     const amount = document.getElementById('amount').value;
     const date = document.getElementById('date').value;
-    const sector = document.getElementById('sector').value;
+    let sector = document.getElementById('sector').value;
     const notes = document.getElementById('notes').value;
+
+    // إذا كان المخول صلاة جمعة، يتم تعيين القاطع تلقائياً
+    if (appData.currentUser.agentType === 'friday_prayer') {
+        sector = "صلاة الجمعة مدينة الصدر";
+    }
 
     if (!donorName || !amount || !receiptNum || !date || !sector) {
         alert('يرجى ملء جميع الحقول');
@@ -250,7 +263,6 @@ window.addOrUpdateReceipt = function() {
                 window.cancelEdit();
             });
     } else {
-        // تحقق من التكرار محلياً قبل الإرسال
         if(appData.receipts.some(r => r.receiptNum == receiptNum)) {
             alert('رقم الوصل مكرر!');
             return;
@@ -258,8 +270,8 @@ window.addOrUpdateReceipt = function() {
 
         const newReceipt = {
             ...receiptData,
-            id: Date.now(), // ID رقمي للترتيب
-            userId: appData.currentUser.id, // ربط بالـ ID الخاص بوثيقة المستخدم
+            id: Date.now(), 
+            userId: appData.currentUser.id, 
             userName: appData.currentUser.name,
             entryDate: new Date().toLocaleString('ar-IQ')
         };
@@ -284,7 +296,12 @@ window.prepareEdit = function(docId) {
     document.getElementById('donor-name').value = receipt.donorName;
     document.getElementById('amount').value = receipt.amount;
     document.getElementById('date').value = receipt.date;
-    document.getElementById('sector').value = receipt.sector;
+    
+    // إذا كان مخول عادي نظهر القاطع المختار، صلاة الجمعة مخفي أصلاً
+    if (appData.currentUser.agentType !== 'friday_prayer') {
+        document.getElementById('sector').value = receipt.sector;
+    }
+
     document.getElementById('notes').value = receipt.notes;
 
     document.getElementById('form-title').innerText = "تعديل الوصل";
@@ -314,8 +331,8 @@ function renderAgentTable() {
     const totalMyAmount = myReceipts.reduce((sum, r) => sum + r.amount, 0);
     document.getElementById('agent-total-amount').innerText = totalMyAmount.toLocaleString() + ' د.ع';
 
-    // الترتيب: الأحدث أولاً
-    myReceipts.sort((a, b) => b.receiptNum - a.receiptNum).forEach(r => {
+    // الترتيب: الأقدم أولاً (10, 11, 12) كما طلبت
+    myReceipts.sort((a, b) => a.receiptNum - b.receiptNum).forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${r.receiptNum}</td>
@@ -341,6 +358,9 @@ window.deleteReceipt = function(docId) {
 window.exportAgentData = function() {
     const myReceipts = appData.receipts.filter(r => r.userId === appData.currentUser.id);
     if(myReceipts.length === 0) { alert('لا توجد بيانات'); return; }
+
+    // التأكد من الترتيب عند التصدير
+    myReceipts.sort((a, b) => a.receiptNum - b.receiptNum);
 
     const dataToExport = myReceipts.map(r => ({
         "رقم الوصل": r.receiptNum,
@@ -381,7 +401,7 @@ function populateAgentFilter() {
     select.innerHTML = '<option value="all">كل المخولين</option>';
     appData.users.filter(u => u.role === 'agent').forEach(u => {
         const opt = document.createElement('option');
-        opt.value = u.id; // هنا docId
+        opt.value = u.id;
         opt.textContent = u.name;
         select.appendChild(opt);
     });
@@ -402,6 +422,9 @@ window.renderAdminTable = function() {
         const matchesAgent = filterAgent === 'all' || r.userId == filterAgent;
         return matchesSearch && matchesAgent;
     });
+
+    // الترتيب تصاعدي للأدمن أيضاً
+    filteredReceipts.sort((a, b) => a.receiptNum - b.receiptNum);
 
     filteredReceipts.forEach(r => {
         const agentUser = appData.users.find(u => u.id === r.userId);
@@ -463,10 +486,14 @@ function renderUsersControlTable() {
     const tbody = document.querySelector('#users-control-table tbody');
     tbody.innerHTML = '';
     appData.users.filter(u => u.role === 'agent').forEach(u => {
+        // تحديد النص الظاهر للنوع
+        const typeLabel = u.agentType === 'friday_prayer' ? 'صلاة جمعة' : 'مخول عادي';
+        
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${u.name}</td>
             <td>${u.phone || '-'}</td>
+            <td><small>${typeLabel}</small></td>
             <td><strong style="color:var(--primary); font-size:1.1em;">${u.booksCount || 0}</strong></td>
             <td>${u.address || '-'}</td>
             <td>${u.locked ? '<span style="color:red;">مقفول</span>' : '<span style="color:green;">نشط</span>'}</td>
@@ -499,6 +526,9 @@ window.prepareEditAgent = function(docId) {
     document.getElementById('new-agent-phone').value = user.phone;
     document.getElementById('new-agent-address').value = user.address;
     document.getElementById('new-agent-code').value = user.code;
+    // تعيين النوع
+    document.getElementById('new-agent-type').value = user.agentType || 'normal';
+    
     document.getElementById('agent-modal-title').innerText = "تعديل بيانات المخول";
     window.toggleAgentModal();
 }
@@ -518,6 +548,7 @@ window.toggleAgentModal = function() {
         document.getElementById('new-agent-phone').value = '';
         document.getElementById('new-agent-address').value = '';
         document.getElementById('new-agent-code').value = '';
+        document.getElementById('new-agent-type').value = 'normal';
         document.getElementById('agent-modal-title').innerText = "إضافة مخول جديد";
     }
 }
@@ -528,6 +559,7 @@ window.saveAgentProcess = function() {
     const phone = document.getElementById('new-agent-phone').value;
     const address = document.getElementById('new-agent-address').value;
     const code = document.getElementById('new-agent-code').value;
+    const agentType = document.getElementById('new-agent-type').value; // قراءة النوع
 
     if(!name || !code) { alert('الاسم والرمز حقول إجبارية'); return; }
 
@@ -535,14 +567,62 @@ window.saveAgentProcess = function() {
         if(appData.users.some(u => u.code === code && u.id != editId)) {
             alert('الرمز مستخدم مسبقاً'); return;
         }
-        updateDoc(doc(db, "users", editId), { name, phone, address, code })
+        updateDoc(doc(db, "users", editId), { name, phone, address, code, agentType })
             .then(() => { alert('تم التعديل'); window.toggleAgentModal(); });
     } else {
         if(appData.users.some(u => u.code === code)) { alert('الرمز مستخدم'); return; }
         addDoc(collection(db, "users"), {
-            name, phone, address, code, role: 'agent', booksCount: 0, locked: false, timestamp: Date.now()
+            name, phone, address, code, agentType, role: 'agent', booksCount: 0, locked: false, timestamp: Date.now()
         }).then(() => { alert('تمت الإضافة'); window.toggleAgentModal(); });
     }
+}
+
+// دالة معالجة ملف الإكسل لإضافة المخولين
+window.processAgentExcel = function(input) {
+    const file = input.files[0];
+    if(!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+        if(jsonData.length === 0) { alert('الملف فارغ'); return; }
+
+        if(!confirm(`هل أنت متأكد من إضافة ${jsonData.length} مخول؟`)) return;
+
+        const batch = writeBatch(db);
+        let count = 0;
+
+        jsonData.forEach(row => {
+            // المتوقع في الإكسل: الاسم, الهاتف, العنوان, الرمز, النوع
+            // النوع في الإكسل يفضل أن يكون: "normal" أو "friday_prayer"
+            const code = String(row['الرمز'] || row['code']);
+            if(appData.users.some(u => u.code === code)) return; // تخطي المكرر
+
+            const docRef = doc(collection(db, "users"));
+            batch.set(docRef, {
+                name: row['الاسم'] || row['name'],
+                phone: row['الهاتف'] || row['phone'] || '',
+                address: row['العنوان'] || row['address'] || '',
+                code: code,
+                agentType: row['النوع'] || row['type'] === 'صلاة جمعة' ? 'friday_prayer' : 'normal',
+                role: 'agent',
+                booksCount: 0,
+                locked: false,
+                timestamp: Date.now()
+            });
+            count++;
+        });
+
+        batch.commit().then(() => {
+            alert(`تم إضافة ${count} مخول بنجاح`);
+            input.value = ''; // تصفير الملف
+        }).catch(err => alert('حدث خطأ: ' + err.message));
+    };
+    reader.readAsArrayBuffer(file);
 }
 
 // وظائف عامة للأدمن
@@ -609,6 +689,9 @@ window.exportAgentsSummary = function() {
 }
 
 window.exportAllData = function() {
+    // تصدير الكل بترتيب تصاعدي أيضاً
+    appData.receipts.sort((a, b) => a.receiptNum - b.receiptNum);
+    
     const data = appData.receipts.map(r => {
         const u = appData.users.find(u => u.id === r.userId);
         return { "المخول": u ? u.name : r.userName, "الوصل": r.receiptNum, "المساهم": r.donorName, "المبلغ": r.amount, "التاريخ": r.date, "القاطع": r.sector };
