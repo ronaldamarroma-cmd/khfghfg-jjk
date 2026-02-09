@@ -429,11 +429,14 @@ window.renderAdminTable = function() {
     filteredReceipts.forEach(r => {
         const agentUser = appData.users.find(u => u.id === r.userId);
         const agentName = agentUser ? agentUser.name : r.userName;
+        // تحديد النص الظاهر للنوع
+        const typeLabel = agentUser && agentUser.agentType === 'friday_prayer' ? 'صلاة جمعة' : 'مخول عادي';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${r.receiptNum}</td>
             <td>${agentName}</td>
-            <td>${r.donorName}</td>
+            <td>${typeLabel}</td> <td>${r.donorName}</td>
             <td>${r.amount.toLocaleString()}</td>
             <td>${r.date}</td>
             <td><small>${r.entryDate}</small></td>
@@ -694,7 +697,18 @@ window.exportAllData = function() {
     
     const data = appData.receipts.map(r => {
         const u = appData.users.find(u => u.id === r.userId);
-        return { "المخول": u ? u.name : r.userName, "الوصل": r.receiptNum, "المساهم": r.donorName, "المبلغ": r.amount, "التاريخ": r.date, "القاطع": r.sector };
+        // إضافة نوع المخول للتصدير
+        const typeLabel = u && u.agentType === 'friday_prayer' ? 'صلاة جمعة' : 'مخول عادي';
+
+        return { 
+            "المخول": u ? u.name : r.userName, 
+            "نوع المخول": typeLabel, // هذا هو التعديل المطلوب
+            "الوصل": r.receiptNum, 
+            "المساهم": r.donorName, 
+            "المبلغ": r.amount, 
+            "التاريخ": r.date, 
+            "القاطع": r.sector 
+        };
     });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
