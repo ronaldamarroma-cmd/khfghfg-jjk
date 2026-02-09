@@ -89,7 +89,7 @@
                             <input type="date" id="date" class="form-control">
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="sector-group">
                             <label>القاطع</label>
                             <select id="sector" class="form-control">
                                 <option value="">اختر القاطع...</option>
@@ -163,6 +163,10 @@
                         
                         <button onclick="window.exportAllData()" class="btn btn-warning"><i class="fas fa-file-excel"></i> تصدير الكل</button>
                         <button onclick="window.toggleAgentModal()" class="btn btn-primary"><i class="fas fa-user-plus"></i> إضافة مخول</button>
+                        
+                        <input type="file" id="bulk-agents-file" style="display:none" onchange="window.processAgentExcel(this)">
+                        <button onclick="document.getElementById('bulk-agents-file').click()" class="btn btn-success"><i class="fas fa-file-upload"></i> رفع مخولين (Excel)</button>
+                        
                         <button onclick="window.toggleAgentsSummaryModal()" class="btn btn-dark"><i class="fas fa-users-cog"></i> ملخص مبالغ المخولين</button>
                         
                         <button onclick="window.clearAllData()" class="btn btn-danger"><i class="fas fa-trash-alt"></i> تفريغ البيانات</button>
@@ -178,7 +182,7 @@
                                 <tr>
                                     <th>اسم المخول</th>
                                     <th>رقم الهاتف</th>
-                                    <th>عدد الدفاتر</th> <th>العنوان/الدائرة</th>
+                                    <th>نوع المخول</th> <th>عدد الدفاتر</th> <th>العنوان/الدائرة</th>
                                     <th>الحالة</th>
                                     <th>إجراءات الحساب</th>
                                 </tr>
@@ -219,6 +223,15 @@
             <div class="form-group"><label>اسم المخول</label><input type="text" id="new-agent-name" class="form-control"></div>
             <div class="form-group"><label>رقم الهاتف</label><input type="text" id="new-agent-phone" class="form-control"></div>
             <div class="form-group"><label>الدائرة أو العنوان</label><input type="text" id="new-agent-address" class="form-control"></div>
+            
+            <div class="form-group">
+                <label>نوع المخول</label>
+                <select id="new-agent-type" class="form-control">
+                    <option value="normal">مخول عادي</option>
+                    <option value="friday_prayer">صلاة الجمعة مدينة الصدر</option>
+                </select>
+            </div>
+
             <div class="form-group"><label>رمز الدخول</label><input type="text" id="new-agent-code" class="form-control"></div>
             <button onclick="window.saveAgentProcess()" class="btn btn-primary" style="width: 100%;">حفظ البيانات</button>
         </div>
