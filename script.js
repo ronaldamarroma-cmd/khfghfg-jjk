@@ -436,7 +436,8 @@ window.renderAdminTable = function() {
         tr.innerHTML = `
             <td>${r.receiptNum}</td>
             <td>${agentName}</td>
-            <td>${typeLabel}</td> <td>${r.donorName}</td>
+            <td>${typeLabel}</td>
+            <td>${r.sector}</td> <td>${r.donorName}</td>
             <td>${r.amount.toLocaleString()}</td>
             <td>${r.date}</td>
             <td><small>${r.entryDate}</small></td>
